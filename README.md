@@ -9,12 +9,12 @@ usage: load_csv_or_json_to_elasticsearch.py [-h] [--es_host ES_HOST]
 
 Load data from CSV file or newline delimited JSON file to a running Elasticsearch cluster.
 
-positional arguments:
+**positional arguments:**     
   input_file            Path to the input csv/json file. Must end with .csv or
-                        .json/.log
-  es_index_name         Name of the index in which to index the documents.
+                        .json/.log     
+  es_index_name         Name of the index in which to index the documents.     
 
-optional arguments:
+**optional arguments:**     
   -h, --help            show this help message and exit
   --es_host ES_HOST     Hostname and port of an Elasticsearch node. Defaults
                         to 'localhost:9200'.
