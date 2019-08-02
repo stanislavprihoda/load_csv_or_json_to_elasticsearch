@@ -1,7 +1,6 @@
 # load_csv_or_json_to_elasticsearch
 
-Example:
-python3 load_csv_or_json_to_elasticsearch.py -h
+python3 load_csv_or_json_to_elasticsearch.py -h     
 usage: load_csv_or_json_to_elasticsearch.py [-h] [--es_host ES_HOST]
                                             [--es_id_field ES_ID_FIELD]
                                             [--es_id_start_from ES_ID_START_FROM]
