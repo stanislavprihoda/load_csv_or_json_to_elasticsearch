@@ -27,19 +27,13 @@ class ElasticDataloader(object):
 
     def load_dataset(self, es_dataset, chunk_size=500, **kwargs):
         try:
-
-            if es_dataset.delete_index_first:
-                self._logger.debug(
-                    f"Attemting to delete the index {es_dataset.es_index_name} first as requested.")
-                self._delete_index(es_dataset.es_index_name)
-            self._logger.debug(
-                f"Parforming index {es_dataset.es_index_name} existence confirmation.")
-            self.client.indices.create(
-                index=es_dataset.es_index_name, ignore=400)
+            self._prepare_index(es_dataset)
             bulks_processed = 0
             not_ok = []
-            for cnt, res in enumerate(streaming_bulk(self.client, self.csv_iterator(es_dataset), chunk_size)):
-                ok, result = res
+            generator = self._csv_generator(
+                es_dataset) if es_dataset.ext == "csv" else self._ndjson_generator(es_dataset)
+            for cnt, response in enumerate(streaming_bulk(self.client, generator, chunk_size)):
+                ok, result = response
                 if not ok:
                     not_ok.append(result)
                 if cnt % chunk_size == 0:
@@ -70,15 +64,15 @@ class ElasticDataloader(object):
                 f"Issue with file: {es_dataset.input_file} {e}")
             raise ElasticDataloaderException from e
         else:
-            return cnt
+            return cnt+1
 
-    def csv_iterator(self, es_dataset, **kwargs):
+    def _csv_generator(self, es_dataset, **kwargs):
         with open(es_dataset.input_file) as csv_file:
             csv_dict_reader = csv.DictReader(csv_file)
             for cnt, row in enumerate(csv_dict_reader):
                 yield self._prepare_document_for_bulk(es_dataset, row, cnt)
 
-    def ndjson_iterator(self, es_dataset, **kwargs):
+    def _ndjson_generator(self, es_dataset, **kwargs):
         with open(es_dataset.input_file) as fp:
             for cnt, line in enumerate(fp):
                 row = json.loads(line)
@@ -88,16 +82,21 @@ class ElasticDataloader(object):
         row["_id"] = row.get(es_dataset.es_id_field, cnt +
                              es_dataset.es_index_start_from)
         row["_index"] = es_dataset.es_index_name
-        row["_doc"] = "_doc"
+        # row["_type"] = "_doc"
         return row
 
-    def _delete_index(self, es_index_name):
-        try:
-            res = self.client.indices.delete(index=es_index_name)
-        except elasticsearch.NotFoundError:
-            self._logger.debug("Required index for delete not found.")
-        else:
-            return res
+    def _prepare_index(self, es_dataset):
+        if es_dataset.delete_index_first:
+            self._logger.debug(
+                f"Attemting to delete the index {es_dataset.es_index_name} first as requested.")
+            try:
+                res = self.client.indices.delete(
+                    index=es_dataset.es_index_name)
+            except elasticsearch.NotFoundError:
+                self._logger.debug("Required index for deletion not found.")
+        self._logger.debug(
+            f"Making sure index {es_dataset.es_index_name} exists.")
+        self.client.indices.create(index=es_dataset.es_index_name, ignore=400)
 
     # ####### KEPT HERE JUST FOR EVENTUAL TESTING PURPOSES #######
     # def load_csv_doc_by_doc(self, es_dataset, **kwargs) -> dict:
@@ -113,15 +112,17 @@ class ElasticDataloader(object):
     #             result, doc_load_success = res['result'], 1 if (res['_shards']
     #                                                             ['successful'] > 0) else 0
     #             operations[_id] = [result, doc_load_success]
-    #     return operations
+    #     return len(operations)
+    # ############################################################
 
 
 class ElasticDataloaderSet:
+    allowed_extensions = ['csv', 'json', 'log']
+
     def __init__(self, input_file, es_index_name, es_id_field="_id", es_index_start_from=1, delete_index_first=False, **kwargs):
         self.input_file, self.es_index_name, self.es_id_field, self.es_index_start_from, self.delete_index_first = input_file, es_index_name, es_id_field, es_index_start_from, delete_index_first
         # kinda simplistic check on the extension - shall be improved in actual use
         self.ext = self.input_file.split('.')[-1]
-        self.allowed_extensions = ['csv', 'json', 'log']
         if self.ext not in self.allowed_extensions:
             raise ValueError(
                 'Given file format is not supported - only .csv or newline-delimited json (.json or .log).')
@@ -186,7 +187,7 @@ def _parse_args():
     parser.add_argument('--es_id_start_from',
                         help='Starting id number if no index_field is provided. Defaults to 1.')
     parser.add_argument('--delete_index_first', choices=[True, False], type=bool,
-                        help='Whether to delete existing index first before loading.')
+                        help='Whether to clear the index first before loading new data.')
     args = parser.parse_args()
     return vars(args)
 

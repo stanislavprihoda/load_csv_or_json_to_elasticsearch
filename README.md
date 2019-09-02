@@ -1,5 +1,7 @@
 # load_csv_or_json_to_elasticsearch
 
+Related info: https://towardsdatascience.com/from-scratch-to-search-setup-elasticsearch-under-4-minutes-load-a-csv-with-python-and-read-e31405d244f1
+
 #### python3 load_csv_or_json_to_elasticsearch.py -h     
 usage: load_csv_or_json_to_elasticsearch.py [-h] [--es_host ES_HOST]     
                                             [--es_id_field ES_ID_FIELD]     
@@ -26,7 +28,7 @@ Load data from CSV file or newline delimited JSON file to a running Elasticsearc
                         Starting id number if no index_field is provided.
                         Defaults to 1.    
   --delete_index_first {True,False} 
-                        Whether to delete existing index first before loading.    
+                        Whether to clear the index first before loading new data.    
 
 Example:    
 #### python3 load_csv_or_json_to_elasticsearch.py my-data.csv my-elastic-index
